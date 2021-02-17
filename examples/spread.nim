@@ -21,14 +21,14 @@ proc test* =
 
   let spreadedArray = ...(
     a[0], b[0], returnInt(), num.float32,
-    a[1], b[1], returnVec4f(),
+    a[1], b[1], returnVec4f(), vec4f(-1, -2, -3, -4),
     a[2], b[2],
   )
   echo &"{$typeof(spreadedArray)}\n{$spreadedArray}"
 
   let spreadedSeq = ...@(
     a[0], b[0], returnInt(), num.float32,
-    a[1], b[1], returnVec4f(),
+    a[1], b[1], returnVec4f(), vec4f(-1, -2, -3, -4),
     a[2], b[2],
   )
   echo &"{$typeof(spreadedSeq)}\n{$spreadedSeq}"

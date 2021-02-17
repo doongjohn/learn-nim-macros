@@ -10,8 +10,8 @@ template newLetSym*(letSection, rhs: NimNode): NimNode =
   sym
 
 
-macro callByName*(v: string, args: varargs[NimNode]): untyped =
+macro invoke*(v: string, args: varargs[NimNode]): untyped =
   result = newNimNode(nnkCall)
-  result.add newIdentNode("spread" & v.strVal)
+  result.add newIdentNode(v.strVal)
   for arg in args:
     result.add arg

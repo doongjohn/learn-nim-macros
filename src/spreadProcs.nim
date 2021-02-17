@@ -1,5 +1,13 @@
 import std/macros
+import std/strutils
 import macroutils
+
+
+template spread*(typeInst: NimNode, typeName: string, node, letSection, bracketExpr: NimNode) =
+  # spread glm/Vec
+  if typeName.startsWith "Vec":
+    "spreadVec".invoke(node, letSection, bracketExpr)
+    return
 
 
 proc spreadVec*(node, letSection, bracketExpr: NimNode) =

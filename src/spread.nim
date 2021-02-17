@@ -13,7 +13,7 @@ const basicPrimitives = {
 
 proc spread(node, letSection, bracketExpr: NimNode) =
   let typeInst = node.getTypeInst
-  let strRepr = typeInst.strVal
+  let typeName = typeInst.strVal
   
   # spread literals
   if node.kind in nnkLiterals:
@@ -25,11 +25,8 @@ proc spread(node, letSection, bracketExpr: NimNode) =
     bracketExpr.add quote do: `node`
     return
   
-  # spread glm/Vec
-  # TODO: find a way to make it extensible
-  if strRepr.high > 2 and strRepr[0 .. 2] == "Vec":
-    callByName("Vec", node, letSection, bracketExpr)
-    return
+  # custom spread
+  spread(typeInst, typeName, node, letSection, bracketExpr)
 
 
 macro `...`*(args: varargs[typed]): untyped =
