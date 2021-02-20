@@ -1,6 +1,7 @@
 import std/strformat
 import glm
 import ../src/spread
+import ../src/spreadProcs
 
 
 proc test* =

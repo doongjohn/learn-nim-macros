@@ -1,16 +1,22 @@
 import std/macros
 import std/strutils
 import macroutils
+import spread
+
+{.experimental: "codeReordering".}
 
 
-template spread*(typeInst: NimNode, typeName: string, node, letSection, bracketExpr: NimNode) =
+setCustomSpreadProc(spreadProc)
+
+
+proc spreadProc(typeInst: NimNode, typeName: string, node, letSection, bracketExpr: NimNode) =
   # spread glm/Vec
   if typeName.startsWith "Vec":
-    "spreadVec".invoke(node, letSection, bracketExpr)
+    spreadVec(node, letSection, bracketExpr)
     return
 
 
-proc spreadVec*(node, letSection, bracketExpr: NimNode) =
+proc spreadVec(node, letSection, bracketExpr: NimNode) =
   let sym = node[0]
   let impl = node.getTypeImpl()
   let max = impl[2][0][1][1][2].intVal

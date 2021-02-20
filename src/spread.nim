@@ -1,6 +1,10 @@
 import std/macros
-import macroutils
-import spreadProcs
+
+
+type SpreadProc = proc(typeInst: NimNode, typeName: string, node, letSection, bracketExpr: NimNode)
+
+var compCustomSpreadProc {.compileTime.}: SpreadProc
+const customSpreadProc = compCustomSpreadProc
 
 
 const basicPrimitives = {
@@ -11,10 +15,14 @@ const basicPrimitives = {
 }
 
 
+proc setCustomSpreadProc*(p: static SpreadProc) =
+  static: compCustomSpreadProc = p
+
+
 proc spread(node, letSection, bracketExpr: NimNode) =
   let typeInst = node.getTypeInst
   let typeName = typeInst.strVal
-  
+
   # spread literals
   if node.kind in nnkLiterals:
     bracketExpr.add quote do: `node`
@@ -26,7 +34,8 @@ proc spread(node, letSection, bracketExpr: NimNode) =
     return
   
   # custom spread
-  spread(typeInst, typeName, node, letSection, bracketExpr)
+  if customSpreadProc != nil:
+    customSpreadProc(typeInst, typeName, node, letSection, bracketExpr)
 
 
 macro `...`*(args: varargs[typed]): untyped =
