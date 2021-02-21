@@ -1,9 +1,7 @@
 import std/macros
 
 
-type SpreadProc = proc(typeInst: NimNode, typeName: string, node, letSection, bracketExpr: NimNode)
-
-var compCustomSpreadProc {.compileTime.}: SpreadProc
+var compCustomSpreadProc {.compileTime.}: proc(typeInst: NimNode, typeName: string, node, letSection, bracketExpr: NimNode)
 const customSpreadProc = compCustomSpreadProc
 
 
