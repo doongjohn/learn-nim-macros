@@ -113,13 +113,13 @@ macro compose*(t: typedesc) =
           details.add (name, ty, exported)
         uniqueFields.add (usedFields[i], details)
         inc i
-      else:
-        when not defined(hideComposeHint):
-          hint(msg_ambiguous name, ty)
-          for idx in dups:
-            hint(msg_ambiguous usedFields[idx].fieldName, usedFields[idx].fieldType)
-        usedFields.removeAt(i & dups);
-        if i == usedFields.len: dec i
+        continue
+      when not defined(hideComposeHint):
+        hint(msg_ambiguous(name), ty)
+        for idx in dups:
+          hint(msg_ambiguous(usedFields[idx].fieldName), usedFields[idx].fieldType)
+      usedFields.removeAt(i & dups);
+      if i == usedFields.len: dec i
   
   # remove duplicate names
   for f in uniqueFields.mitems:
@@ -140,7 +140,7 @@ macro compose*(t: typedesc) =
         dupField.details.del i_detail
   
   # generate getters and setters
-  defer: echo result.repr
+  # defer: echo result.repr
   let self = ident "self"
   let val = ident "val"
   for f in uniqueFields:

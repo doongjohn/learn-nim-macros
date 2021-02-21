@@ -23,7 +23,6 @@ type
 proc test* =
   compose Player
 
-  echo "-------------------"
   var p: Player
   
   p.name = "John"
@@ -37,6 +36,6 @@ proc test* =
   echo "     age: " & $p.age
   
   p.position = Vector2(x: 2.0, y: 2.0)
+  p.y = 10
   echo "position: " & $(p.position.x, p.y)
-  
-  echo "-------------------"
+ 
