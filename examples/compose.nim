@@ -20,9 +20,10 @@ type
     data {.use.}: Data
 
 
-proc test* =
-  compose Player
+compose Player
 
+
+proc test* =
   var p: Player
   
   p.name = "John"

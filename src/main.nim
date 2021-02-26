@@ -1,8 +1,8 @@
-# import ../examples/compose
-# compose.test()
+import ../examples/compose
+compose.test()
 
 # import ../examples/spread
 # spread.test()
 
-import ../examples/nameofmacro
-nameofmacro.test()
+# import ../examples/nameofmacro
+# nameofmacro.test()
