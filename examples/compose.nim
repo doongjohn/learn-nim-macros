@@ -28,13 +28,13 @@ proc test* =
   
   p.name = "John"
   p.age = 5
-  echo "    name: " & $p.name
-  echo "     age: " & $p.age
+  echo "name: " & $p.name
+  echo " age: " & $p.age
   
   p.creature.name = "Mike"
   p.creature.age = 12
-  echo "    name: " & $p.name
-  echo "     age: " & $p.age
+  echo "name: " & $p.name
+  echo " age: " & $p.age
   
   p.position = Vector2(x: 2.0, y: 2.0)
   p.y = 10

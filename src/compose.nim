@@ -1,5 +1,5 @@
 import std/macros
-import std/algorithm
+import std/strformat
 
 
 type
@@ -19,24 +19,32 @@ type
 template use* {.pragma.}
 
 
-proc removeAt[T](list: var seq[T], indices: openArray[int]) =
-  # indices must be ordered
-  for i in indices.reversed:
-    list.del i
+# make alias
+template `@=`(name, v: untyped) {.dirty.} =
+  template name: auto = v
 
 
-proc findDupType(s: FieldInfos, v: NimNode, currentName: NimNode): seq[int] =
+iterator findDupTypes(s: FieldInfos, idx: Natural): Natural =
+  var v = s[idx]
   for i, f in s:
-    if eqIdent(f.fieldName, currentName): continue
-    if eqIdent(f.fieldType, v): result.add i
+    if i == idx: continue
+    if eqIdent(f.fieldType, v.fieldType):
+      yield i
 
 
-proc findDupName(s: FieldDetails, v: NimNode, current: FieldDetail): seq[tuple[fieldIdx, detailIdx: int]] =
-  for i_field, f in s:
-    if f == current: continue
-    for i_detail, d in f.details:
-      if eqIdent(d.fieldName, v):
-        result.add (i_field, i_detail)
+iterator findDupNames(s: FieldDetails, fIdx, dIdx:Natural): tuple[fieldIdx, detailIdx: int] =
+  let v = s[fIdx].details[dIdx]
+  for fi, f in s:
+    var di = 0
+    while di < f.details.len:
+      if (fi, di) == (fIdx, dIdx):
+        inc di
+        continue
+      d @= f.details[di]
+      if eqIdent(d.fieldName, v.fieldName):
+        yield (fi, di)
+      else:
+        inc di
 
 
 template getObjImpl(ty: untyped): NimNode =
@@ -53,7 +61,7 @@ template getObjImpl(ty: untyped): NimNode =
   var objTy = impl[2]
   if objTy.kind in {nnkRefTy, nnkPtrTy}:
     objTy = objTy[0] # Unwrap ref/ptr types
-  objTy.expectKind(nnkObjectTy) # Check that the type is actually an object
+  objTy.expectKind(nnkObjectTy)
   objTy
 
 
@@ -67,8 +75,8 @@ template getFieldsTemplate(ty: NimNode, body: untyped) =
       body
 
 
-iterator getFields(ty: NimNode): tuple[name, ty: NimNode, exported: bool] =
-  getFieldsTemplate(ty):
+iterator getFields(ty: NimNode): FieldInfo =
+  ty.getFieldsTemplate:
     case field.kind
     of nnkIdent:
       yield (field, fieldType, false)
@@ -79,75 +87,80 @@ iterator getFields(ty: NimNode): tuple[name, ty: NimNode, exported: bool] =
 
 
 proc getUsedFields(ty: NimNode): FieldInfos =
-  getFieldsTemplate(ty):
+  ty.getFieldsTemplate:
     if field.kind == nnkPragmaExpr:
       for p in field[1]:
-        if p.strVal != "use": continue # check pragma
+        if p.strVal != "use": continue
         case field[0].kind
         of nnkIdent:
           result.add (field[0], fieldType, false)
         of nnkPostfix:
           result.add (field[0][1], fieldType, true)
         else:
-          error("it's not a field!", field)
+          error("It's not a field!", field)
 
 
-template msg_ambiguous(x: untyped): string {.used.} =
-  "Will not generate getter & setter for \"" & x.repr & "\" because it is ambiguous!"
-
+proc hint_ambiguous(name, node: NimNode) {.used.} =
+  when not defined(hideComposeHint):
+    hint(&"Will not generate getter & setter for \"{name.repr}\" because it is ambiguous!"
+, node)
+  
 
 macro compose*(t: typedesc) =
-  result = newStmtList()
   var uniqueFields: FieldDetails
   
   # remove duplicate types
   block:
     var usedFields = t.getUsedFields()
     var i = 0
-    while i > -1 and i < usedFields.len:
-      let (name, ty, _) = usedFields[i]
-      let dups = usedFields.findDupType(ty, name)
-      if dups.len == 0:
+    while i in 0 .. usedFields.high:
+      fname @= usedFields[i].fieldName
+      ftype @= usedFields[i].fieldType
+      var dupFound = false
+      for dupi in usedFields.findDupTypes(i):
+        dupFound = true
+        dupName @= usedFields[dupi].fieldName
+        dupType @= usedFields[dupi].fieldType
+        hint_ambiguous(dupName, dupType)
+        usedFields.del dupi
+      if dupFound:
+        hint_ambiguous(fname, ftype)
+        usedFields.del i
+      else:
         var details: FieldInfos
-        for name, ty, exported in ty.getFields():
-          details.add (name, ty, exported)
-        uniqueFields.add (usedFields[i], details)
+        for detail in ftype.getFields():
+          details &= detail
+        uniqueFields &= (usedFields[i], details)
         inc i
-        continue
-      when not defined(hideComposeHint):
-        hint(msg_ambiguous(name), ty)
-        for idx in dups:
-          hint(msg_ambiguous(usedFields[idx].fieldName), usedFields[idx].fieldType)
-      usedFields.removeAt(i & dups);
-      if i == usedFields.len: dec i
   
   # remove duplicate names
-  for f in uniqueFields.mitems:
-    var i = 0
-    while i > -1 and i < f.details.len:
-      let dups = uniqueFields.findDupName(f.details[i].fieldName, f)
-      if dups.len == 0:
-        inc i
-        continue
-      when not defined(hideComposeHint):
-        hint(msg_ambiguous(f.details[i].fieldName), f.field.fieldName)
-      f.details.del i
-      if i == f.details.len: dec i
-      for (i_field, i_detail) in dups:
-        template dupField: auto = uniqueFields[i_field]
-        when not defined(hideComposeHint):
-          hint(msg_ambiguous(dupField.details[i_detail].fieldName), dupField.field.fieldName)
-        dupField.details.del i_detail
+  for fi, f in uniqueFields.mpairs:
+    var di = 0
+    while di in 0 .. f.details.high:
+      var dupFound = false
+      for dupfi, dupdi in uniqueFields.findDupNames(fi, di):
+        dupFound = true
+        dupDetails @= uniqueFields[dupfi].details
+        dupName @= dupDetails[dupdi].fieldName
+        hint_ambiguous(dupName, dupName)
+        dupDetails.del dupdi
+      if dupFound:
+        fname @= f.details[di].fieldName
+        hint_ambiguous(fname, fname)
+        f.details.del di
+      else:
+        inc di
   
   # generate getters and setters
-  # defer: echo result.repr
+  result = newStmtList()
   let self = ident "self"
   let val = ident "val"
+  # defer: echo result.repr
   for f in uniqueFields:
     let fname = f.field.fieldName
     for (name, ty, exported) in f.details:
       var getter = name
-      var setter = nnkAccQuoted.newTree(name, ident "=")
+      var setter = newTree(nnkAccQuoted, name, ident "=")
       if exported:
         getter = getter.postfix("*")
         setter = setter.postfix("*")
