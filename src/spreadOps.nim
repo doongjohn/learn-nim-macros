@@ -1,8 +1,25 @@
 import std/macros
 
 
-var compCustomSpreadProc {.compileTime.}: proc(typeInst: NimNode, typeName: string, node, letSection, bracketExpr: NimNode)
+var compCustomSpreadProc {.compileTime.}:
+  proc(
+    typeInst: NimNode,
+    typeName: string,
+    node, letSection, bracketExpr: NimNode
+  )
+
 const customSpreadProc = compCustomSpreadProc
+
+template setCustomSpreadProc*(body: untyped) =
+  static:
+    compCustomSpreadProc =
+      proc(
+        typeInst {.inject.}: NimNode,
+        typeName {.inject.}: string,
+        node {.inject.},
+        letSection {.inject.},
+        bracketExpr {.inject.}: NimNode
+      ) = body
 
 
 const basicPrimitives = {
@@ -11,12 +28,6 @@ const basicPrimitives = {
   ntyInt, ntyInt8, ntyInt16, ntyInt32, ntyInt64,
   ntyFloat, ntyFloat32, ntyFloat64, ntyFloat128
 }
-
-
-template setCustomSpreadProc*(body: untyped) =
-  static:
-    compCustomSpreadProc =
-      proc(typeInst {.inject.}: NimNode, typeName {.inject.}: string, node {.inject.}, letSection {.inject.}, bracketExpr {.inject.}: NimNode) = body
 
 
 # TODO: implement spread for basic types

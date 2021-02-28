@@ -1,34 +1,33 @@
-import std/strformat
-import glm
-import ../src/spread
+# This is an example of
+# user defined spread module.
+
+import std/macros
+import std/strutils
+import ../src/macroutils
+import ../src/spreadOps
+export spreadOps
+
+{.experimental: "codeReordering".}
+{.used.}
 
 
-proc test* =
-  let num = 1'u8
-  let a = [
-    vec3f(10, 20, 30),
-    vec3f(10, 20, 30),
-    vec3f(10, 20, 30),
-  ]
-  let b = [
-    vec4f(10, 20, 30, 40),
-    vec4f(10, 20, 30, 40),
-    vec4f(10, 20, 30, 40),
-  ]
-  
-  proc returnVec4f: auto = vec4f(100, 200, 300, 400)
-  proc returnInt: auto = 0
+setCustomSpreadProc:
+  # spread glm/Vec
+  if typeName.startsWith "Vec":
+    spreadVec(node, letSection, bracketExpr)
+    return
 
-  let spreadedArray = ...(
-    a[0], b[0], returnInt(), num.float32,
-    a[1], b[1], returnVec4f(), vec4f(-1, -2, -3, -4),
-    a[2], b[2],
-  )
-  echo &"{$typeof(spreadedArray)}\n{$spreadedArray}"
 
-  let spreadedSeq = ...@(
-    a[0], b[0], returnInt(), num.float32,
-    a[1], b[1], returnVec4f(), vec4f(-1, -2, -3, -4),
-    a[2], b[2],
-  )
-  echo &"{$typeof(spreadedSeq)}\n{$spreadedSeq}"
+proc spreadVec(node, letSection, bracketExpr: NimNode) =
+  let sym = node[0]
+  let impl = node.getTypeImpl()
+  let max = impl[2][0][1][1][2].intVal
+  case node.kind
+  of nnkCall:
+    let letSym = newLetSym(letSection, node)
+    for i in 0 .. max:
+      bracketExpr.add quote do: `letSym`.arr[`i`]
+  else:
+    let idx = node[1][1]
+    for i in 0 .. max:
+      bracketExpr.add quote do: `sym`[`idx`].arr[`i`]
