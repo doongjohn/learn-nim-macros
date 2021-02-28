@@ -5,7 +5,6 @@ macro nameofAux(x: typed): string =
   case x.kind
   of nnkSym, nnkIdent, nnkClosedSymChoice:
     return x.toStrLit
-    return
   of nnkDotExpr:
     return x.last.toStrLit
   of nnkBracketExpr:
