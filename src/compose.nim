@@ -16,12 +16,64 @@ type
   FieldDetails = seq[FieldDetail]
 
 
+# put this pragma on desired field
 template use* {.pragma.}
 
 
-# make alias
+# alias
 template `@=`(name, v: untyped) {.dirty.} =
   template name: auto = v
+
+
+template getObjImpl(ty: untyped): NimNode =
+  if ty.kind == nnkBracketExpr:
+    error("generics are not suppported! (sorry...)", ty)
+  
+  if ty.kind != nnkSym:
+    error("only object is allowed!", ty)
+  
+  let impl = ty.getImpl()
+  if impl.kind == nnkNilLit:
+    error("only object is allowed!", ty)
+
+  var objTy = impl[2]
+  if objTy.kind in {nnkRefTy, nnkPtrTy}:
+    objTy = objTy[0] # Unwrap ref/ptr types
+  objTy.expectKind(nnkObjectTy)
+  objTy
+
+
+iterator getFieldsIter(ty: NimNode): tuple[field, fieldType: NimNode] =
+  var objTy = ty.getObjImpl
+  for f in objTy[2]:
+    let ftyIndex = f.len - 2
+    for i in 0 ..< ftyIndex:
+      yield (f[i], f[ftyIndex])
+
+
+iterator getFields(ty: NimNode): FieldInfo =
+  for field, fieldType in getFieldsIter(ty):
+    case field.kind
+    of nnkIdent:
+      yield (field, fieldType, false)
+    of nnkPostfix:
+      yield (field[1], fieldType, true)
+    else:
+      error("it's not a field!", field)
+
+
+proc getUsedFields(ty: NimNode): FieldInfos =
+  for field, fieldType in getFieldsIter(ty):
+    if field.kind == nnkPragmaExpr:
+      for p in field[1]:
+        if p.strVal != "use": continue
+        case field[0].kind
+        of nnkIdent:
+          result.add (field[0], fieldType, false)
+        of nnkPostfix:
+          result.add (field[0][1], fieldType, true)
+        else:
+          error("It's not a field!", field)
 
 
 iterator findDupTypes(s: FieldInfos, idx: Natural): Natural =
@@ -47,64 +99,11 @@ iterator findDupNames(s: FieldDetails, fIdx, dIdx:Natural): tuple[fieldIdx, deta
         inc di
 
 
-template getObjImpl(ty: untyped): NimNode =
-  if ty.kind == nnkBracketExpr:
-    error("generics are not suppported! (sorry...)", ty)
-  
-  if ty.kind != nnkSym:
-    error("only object is allowed!", ty)
-  
-  let impl = ty.getImpl()
-  if impl.kind == nnkNilLit:
-    error("only object is allowed!", ty)
-
-  var objTy = impl[2]
-  if objTy.kind in {nnkRefTy, nnkPtrTy}:
-    objTy = objTy[0] # Unwrap ref/ptr types
-  objTy.expectKind(nnkObjectTy)
-  objTy
-
-
-template getFieldsTemplate(ty: NimNode, body: untyped) =
-  var objTy = ty.getObjImpl
-  for f in objTy[2]:
-    let ftyIndex = f.len - 2
-    let fieldType {.inject.} = f[ftyIndex]
-    for i in 0 ..< ftyIndex:
-      template field: auto {.inject.} = f[i]
-      body
-
-
-iterator getFields(ty: NimNode): FieldInfo =
-  ty.getFieldsTemplate:
-    case field.kind
-    of nnkIdent:
-      yield (field, fieldType, false)
-    of nnkPostfix:
-      yield (field[1], fieldType, true)
-    else:
-      error("it's not a field!", field)
-
-
-proc getUsedFields(ty: NimNode): FieldInfos =
-  ty.getFieldsTemplate:
-    if field.kind == nnkPragmaExpr:
-      for p in field[1]:
-        if p.strVal != "use": continue
-        case field[0].kind
-        of nnkIdent:
-          result.add (field[0], fieldType, false)
-        of nnkPostfix:
-          result.add (field[0][1], fieldType, true)
-        else:
-          error("It's not a field!", field)
-
-
 proc hint_ambiguous(name, node: NimNode) {.used.} =
   when not defined(hideComposeHint):
     hint(&"Will not generate getter & setter for \"{name.repr}\" because it is ambiguous!"
 , node)
-  
+
 
 macro compose*(t: typedesc) =
   var uniqueFields: FieldDetails
