@@ -1,7 +1,7 @@
 import std/macros
 
 
-macro nameofAux(x: typed): string =
+macro nameof*(x: typed): string =
   case x.kind
   of nnkSym, nnkIdent, nnkClosedSymChoice:
     return x.toStrLit
@@ -10,8 +10,5 @@ macro nameofAux(x: typed): string =
   of nnkBracketExpr:
     return x[0].toStrLit
   else:
-    quote do: {.error: "It is not a symbol or an identifier.".}
+    error("It is not a symbol or an identifier.", x)
 
-
-template nameof*(x: typed): string =
-  nameofAux(x)
