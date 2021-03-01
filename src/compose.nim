@@ -1,5 +1,6 @@
 import std/macros
 import std/strformat
+import macroutils
 
 
 type
@@ -16,13 +17,8 @@ type
   FieldDetails = seq[FieldDetail]
 
 
-# put this pragma on desired field
+# put this pragma on desired fields
 template use* {.pragma.}
-
-
-# alias
-template `@=`(name, v: untyped) {.dirty.} =
-  template name: auto = v
 
 
 template getObjImpl(ty: untyped): NimNode =
@@ -43,7 +39,7 @@ template getObjImpl(ty: untyped): NimNode =
   objTy
 
 
-iterator getFieldsIter(ty: NimNode): tuple[field, fieldType: NimNode] =
+iterator getObjFieldsAux(ty: NimNode): tuple[field, fieldType: NimNode] =
   var objTy = ty.getObjImpl
   for f in objTy[2]:
     let ftyIndex = f.len - 2
@@ -51,22 +47,25 @@ iterator getFieldsIter(ty: NimNode): tuple[field, fieldType: NimNode] =
       yield (f[i], f[ftyIndex])
 
 
-iterator getFields(ty: NimNode): FieldInfo =
-  for field, fieldType in getFieldsIter(ty):
+iterator getObjFields(ty: NimNode): FieldInfo =
+  for field, fieldType in getObjFieldsAux(ty):
     case field.kind
     of nnkIdent:
+      # not exported
       yield (field, fieldType, false)
     of nnkPostfix:
+      # exported
       yield (field[1], fieldType, true)
     else:
-      error("it's not a field!", field)
+      error("It's not a field!", field)
 
 
-proc getUsedFields(ty: NimNode): FieldInfos =
-  for field, fieldType in getFieldsIter(ty):
+proc getObjFieldsWithPragma(ty: NimNode, pragmaName: string): FieldInfos =
+  for field, fieldType in getObjFieldsAux(ty):
     if field.kind == nnkPragmaExpr:
       for p in field[1]:
-        if p.strVal != "use": continue
+        if p.strVal != pragmaName:
+          continue
         case field[0].kind
         of nnkIdent:
           result.add (field[0], fieldType, false)
@@ -110,9 +109,9 @@ macro compose*(t: typedesc) =
   
   # remove duplicate types
   block:
-    var usedFields = t.getUsedFields()
+    var usedFields = t.getObjFieldsWithPragma("use")
     var i = 0
-    while i in 0 .. usedFields.high:
+    while i < usedFields.len:
       fname @= usedFields[i].fieldName
       ftype @= usedFields[i].fieldType
       var dupFound = false
@@ -127,7 +126,7 @@ macro compose*(t: typedesc) =
         usedFields.del i
       else:
         var details: FieldInfos
-        for detail in ftype.getFields():
+        for detail in ftype.getObjFields():
           details &= detail
         uniqueFields &= (usedFields[i], details)
         inc i
@@ -135,14 +134,14 @@ macro compose*(t: typedesc) =
   # remove duplicate names
   for fi, f in uniqueFields.mpairs:
     var di = 0
-    while di in 0 .. f.details.high:
+    while di < f.details.len:
       var dupFound = false
-      for dupfi, dupdi in uniqueFields.findDupNames(fi, di):
+      for dup in uniqueFields.findDupNames(fi, di):
         dupFound = true
-        dupDetails @= uniqueFields[dupfi].details
-        dupName @= dupDetails[dupdi].fieldName
+        dupDetails @= uniqueFields[dup.fieldIdx].details
+        dupName @= dupDetails[dup.detailIdx].fieldName
         hint_ambiguous(dupName, dupName)
-        dupDetails.del dupdi
+        dupDetails.del dup.detailIdx
       if dupFound:
         fname @= f.details[di].fieldName
         hint_ambiguous(fname, fname)
