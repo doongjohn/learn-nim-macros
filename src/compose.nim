@@ -153,7 +153,6 @@ macro compose*(t: typedesc) =
   result = newStmtList()
   let self = ident "self"
   let val = ident "val"
-  # defer: echo result.repr
   for f in uniqueFields:
     let fname = f.field.fieldName
     for (name, ty, exported) in f.details:

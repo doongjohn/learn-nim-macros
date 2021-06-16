@@ -3,11 +3,11 @@ import std/macros
 
 template `@=`*(name, value: untyped) {.dirty.} =
   # create alias
-  template name: type(value) = value
+  template name: typeof(value) = value
 
 
 template newLetSym*(letSection, rhs: NimNode): NimNode =
-  let sym = genSym(nskLet, "tmp_let")
+  let sym = genSym(nskLet)
   letSection.add newNimNode(nnkIdentDefs)
   letSection.last.add sym
   letSection.last.add newEmptyNode()
